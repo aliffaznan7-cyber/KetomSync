@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "ClipboardEntry": {
+      "title": "ClipboardEntry",
+      "description": "A synchronized clipboard item scoped to an authenticated user across devices.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "content": {
+          "type": "string",
+          "description": "Copied text payload."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["link", "code", "address", "text"],
+          "description": "Auto-detected content category."
+        },
+        "isPinned": {
+          "type": "boolean",
+          "description": "Whether the clipboard entry is pinned."
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Source device display name (e.g., Pixel 9 Pro, Xiaomi Pad 7)."
+        },
+        "deviceType": {
+          "type": "string",
+          "enum": ["phone", "tablet"],
+          "description": "Source device form factor."
+        },
+        "retentionPolicy": {
+          "type": "string",
+          "enum": ["1h", "24h", "7d", "never"],
+          "description": "Retention policy for automatic cleanup."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "content",
+        "category",
+        "isPinned",
+        "deviceName",
+        "deviceType",
+        "retentionPolicy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Snippet": {
+      "title": "Snippet",
+      "description": "Reusable text snippet or macro supporting {variable} expansion.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Snippet title."
+        },
+        "shortcut": {
+          "type": "string",
+          "description": "Short trigger label."
+        },
+        "body": {
+          "type": "string",
+          "description": "Template text containing optional {variable} placeholders."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["macro", "reply", "code", "template"],
+          "description": "Snippet category."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "shortcut",
+        "body",
+        "category",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SyncedDevice": {
+      "title": "SyncedDevice",
+      "description": "Registered user device participating in KetomSync clipboard sync.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Friendly device name."
+        },
+        "deviceType": {
+          "type": "string",
+          "enum": ["phone", "tablet"],
+          "description": "Device form factor."
+        },
+        "modelName": {
+          "type": "string",
+          "description": "Hardware model identifier."
+        },
+        "syncEnabled": {
+          "type": "boolean",
+          "description": "Whether clipboard sync is enabled for this device."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server registration timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-seen timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "deviceName",
+        "deviceType",
+        "modelName",
+        "syncEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/clipboard_entries/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/ClipboardEntry"
+      },
+      "description": "Per-user synchronized clipboard history entries."
+    },
+    "/users/{userId}/snippets/{snippetId}": {
+      "schema": {
+        "$ref": "#/entities/Snippet"
+      },
+      "description": "Per-user synced snippets and variable-expansion macros."
+    },
+    "/users/{userId}/devices/{deviceId}": {
+      "schema": {
+        "$ref": "#/entities/SyncedDevice"
+      },
+      "description": "Per-user linked devices for cross-device clipboard awareness."
+    }
+  }
+}

@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidClipboardEntry(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.content is string && data.content.size() >= 1 && data.content.size() <= 20000 &&
+             data.category in ['link', 'code', 'address', 'text'] &&
+             data.isPinned is bool &&
+             data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 80 &&
+             data.deviceType in ['phone', 'tablet'] &&
+             data.retentionPolicy in ['1h', '24h', '7d', 'never'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSnippet(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.shortcut is string && data.shortcut.size() >= 1 && data.shortcut.size() <= 40 &&
+             data.body is string && data.body.size() >= 1 && data.body.size() <= 5000 &&
+             data.category in ['macro', 'reply', 'code', 'template'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidDevice(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 80 &&
+             data.deviceType in ['phone', 'tablet'] &&
+             data.modelName is string && data.modelName.size() >= 1 && data.modelName.size() <= 80 &&
+             data.syncEnabled is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/clipboard_entries/{entryId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(entryId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(entryId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'content', 'category', 'isPinned',
+                         'deviceName', 'deviceType', 'retentionPolicy',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'content', 'category', 'isPinned',
+                         'deviceName', 'deviceType', 'retentionPolicy',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidClipboardEntry(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidClipboardEntry(incoming()) &&
+                       request.auth.uid == userId &&
+                       isValidId(entryId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'isPinned', 'retentionPolicy', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(entryId);
+    }
+
+    match /users/{userId}/snippets/{snippetId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(snippetId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(snippetId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'shortcut', 'body', 'category',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'shortcut', 'body', 'category',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidSnippet(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidSnippet(incoming()) &&
+                       request.auth.uid == userId &&
+                       isValidId(snippetId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'shortcut', 'body', 'category', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(snippetId);
+    }
+
+    match /users/{userId}/devices/{deviceId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(deviceId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(deviceId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'deviceName', 'deviceType', 'modelName',
+                         'syncEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'deviceName', 'deviceType', 'modelName',
+                         'syncEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidDevice(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidDevice(incoming()) &&
+                       request.auth.uid == userId &&
+                       isValidId(deviceId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'deviceName', 'deviceType', 'modelName', 'syncEnabled', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(deviceId);
+    }
+  }
+}

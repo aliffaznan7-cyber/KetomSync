@@ -1,0 +1,6 @@
+{
+  "name": "KetomSync",
+  "description": "Privacy-focused custom Android keyboard (IME) and cross-device clipboard sync app with gesture cursor control, smart backspace, snippets, and adaptive phone/tablet modes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

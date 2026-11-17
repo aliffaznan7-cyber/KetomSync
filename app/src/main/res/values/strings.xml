@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">KetomSync</string>
+    <string name="ime_name">KetomSync Keyboard</string>
+    <string name="ime_subtype_en">English (QWERTY)</string>
+    <string name="nav_sync">Sync</string>
+    <string name="nav_sandbox">Keyboard</string>
+    <string name="nav_snippets">Snippets</string>
+    <string name="nav_settings">Settings</string>
+</resources>
