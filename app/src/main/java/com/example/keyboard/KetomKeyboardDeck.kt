@@ -19,10 +19,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.mandatorySystemGestures
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -110,7 +114,10 @@ fun KetomKeyboardDeck(
     onUpdateFloatingSize: (Float, Float) -> Unit,
     onUpdateFloatingOffset: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
-    applyNavigationInsets: Boolean = false
+    applyNavigationInsets: Boolean = false,
+    decorBottomInsetPx: Int = 0,
+    decorLeftInsetPx: Int = 0,
+    decorRightInsetPx: Int = 0
 ) {
     val keyboardState by controller.state.collectAsStateWithLifecycle()
     val tokens = LocalKetomTokens.current
@@ -118,14 +125,43 @@ fun KetomKeyboardDeck(
     var promptingSnippet by remember { mutableStateOf<SnippetEntity?>(null) }
     var lastShiftTapMillis by remember { mutableLongStateOf(0L) }
 
-    val baseModifier = if (applyNavigationInsets) {
-        modifier.navigationBarsPadding()
+    val density = LocalDensity.current
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val bottomInsetDp = if (applyNavigationInsets) {
+        val composeBottomPx = maxOf(
+            WindowInsets.navigationBars.getBottom(density),
+            WindowInsets.captionBar.getBottom(density),
+            WindowInsets.mandatorySystemGestures.getBottom(density),
+            WindowInsets.displayCutout.getBottom(density)
+        )
+        with(density) { maxOf(composeBottomPx, decorBottomInsetPx).toDp() }
     } else {
-        modifier
+        0.dp
     }
+    val leftInsetDp = if (applyNavigationInsets) {
+        val composeLeftPx = maxOf(
+            WindowInsets.navigationBars.getLeft(density, layoutDirection),
+            WindowInsets.displayCutout.getLeft(density, layoutDirection)
+        )
+        with(density) { maxOf(composeLeftPx, decorLeftInsetPx).toDp() }
+    } else {
+        0.dp
+    }
+    val rightInsetDp = if (applyNavigationInsets) {
+        val composeRightPx = maxOf(
+            WindowInsets.navigationBars.getRight(density, layoutDirection),
+            WindowInsets.displayCutout.getRight(density, layoutDirection)
+        )
+        with(density) { maxOf(composeRightPx, decorRightInsetPx).toDp() }
+    } else {
+        0.dp
+    }
+    val isFloating = settings.keyboardLayoutMode == KeyboardLayoutMode.FLOATING
 
     BoxWithConstraints(
-        modifier = baseModifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = leftInsetDp, end = rightInsetDp)
     ) {
         val availableWidth = maxWidth
         val isTabletWidth = availableWidth >= 600.dp
@@ -156,7 +192,12 @@ fun KetomKeyboardDeck(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        .padding(
+                            start = 6.dp,
+                            end = 6.dp,
+                            top = 6.dp,
+                            bottom = if (isFloating) 6.dp else 8.dp + bottomInsetDp
+                        )
                 ) {
                     if (settings.keyboardLayoutMode == KeyboardLayoutMode.FLOATING) {
                         FloatingHandleBar(
@@ -284,7 +325,9 @@ fun KetomKeyboardDeck(
         when (settings.keyboardLayoutMode) {
             KeyboardLayoutMode.FLOATING -> {
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = bottomInsetDp + 6.dp),
                     contentAlignment = deckAlignment
                 ) {
                     deckContent(
@@ -311,7 +354,9 @@ fun KetomKeyboardDeck(
                             isRightDocked = true,
                             onFlipSide = onFlipOneHandedSide,
                             onExpandFull = onCycleLayoutMode,
-                            modifier = Modifier.weight(0.25f)
+                            modifier = Modifier
+                                .weight(0.25f)
+                                .padding(bottom = bottomInsetDp)
                         )
                     }
                     deckContent(Modifier.weight(0.75f))
@@ -320,7 +365,9 @@ fun KetomKeyboardDeck(
                             isRightDocked = false,
                             onFlipSide = onFlipOneHandedSide,
                             onExpandFull = onCycleLayoutMode,
-                            modifier = Modifier.weight(0.25f)
+                            modifier = Modifier
+                                .weight(0.25f)
+                                .padding(bottom = bottomInsetDp)
                         )
                     }
                 }

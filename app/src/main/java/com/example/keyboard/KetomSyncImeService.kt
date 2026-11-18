@@ -2,12 +2,17 @@ package com.example.keyboard
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Color as AndroidColor
 import android.inputmethodservice.InputMethodService
+import android.os.Build
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -62,6 +67,9 @@ class KetomSyncImeService :
     private lateinit var keyboardController: KetomKeyboardController
 
     private val currentSettings = MutableStateFlow(KetomSettings())
+    private val decorBottomInsetPx = MutableStateFlow(0)
+    private val decorLeftInsetPx = MutableStateFlow(0)
+    private val decorRightInsetPx = MutableStateFlow(0)
     private var cloudSyncJob: Job? = null
     private var lastCapturedClip: String? = null
 
@@ -159,10 +167,31 @@ class KetomSyncImeService :
     }
 
     override fun onCreateInputView(): View {
-        window?.window?.decorView?.let { decor ->
+        window?.window?.let { win ->
+            WindowCompat.setDecorFitsSystemWindows(win, false)
+            @Suppress("DEPRECATION")
+            win.navigationBarColor = AndroidColor.TRANSPARENT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                win.isNavigationBarContrastEnforced = false
+            }
+            val decor = win.decorView
             decor.setViewTreeLifecycleOwner(this)
             decor.setViewTreeViewModelStoreOwner(this)
             decor.setViewTreeSavedStateRegistryOwner(this)
+
+            ViewCompat.setOnApplyWindowInsetsListener(decor) { view, windowInsets ->
+                val insetTypes = WindowInsetsCompat.Type.navigationBars() or
+                    WindowInsetsCompat.Type.captionBar() or
+                    WindowInsetsCompat.Type.mandatorySystemGestures() or
+                    WindowInsetsCompat.Type.displayCutout()
+                val insets = windowInsets.getInsetsIgnoringVisibility(insetTypes)
+                val visibleInsets = windowInsets.getInsets(insetTypes)
+                decorBottomInsetPx.value = maxOf(insets.bottom, visibleInsets.bottom)
+                decorLeftInsetPx.value = maxOf(insets.left, visibleInsets.left)
+                decorRightInsetPx.value = maxOf(insets.right, visibleInsets.right)
+                ViewCompat.onApplyWindowInsets(view, windowInsets)
+            }
+            ViewCompat.requestApplyInsets(decor)
         }
 
         return ComposeView(this).apply {
@@ -174,6 +203,9 @@ class KetomSyncImeService :
                 ).collectAsStateWithLifecycle(initialValue = emptyList())
                 val snippets by coordinator.observeLocalSnippets()
                     .collectAsStateWithLifecycle(initialValue = emptyList())
+                val bottomInsetPx by decorBottomInsetPx.collectAsStateWithLifecycle()
+                val leftInsetPx by decorLeftInsetPx.collectAsStateWithLifecycle()
+                val rightInsetPx by decorRightInsetPx.collectAsStateWithLifecycle()
 
                 KetomSyncTheme(
                     themeMode = settings.themeMode,
@@ -214,7 +246,10 @@ class KetomSyncImeService :
                         onUpdateFloatingOffset = { x, y ->
                             serviceScope.launch { settingsDataStore.setFloatingOffset(x, y) }
                         },
-                        applyNavigationInsets = true
+                        applyNavigationInsets = true,
+                        decorBottomInsetPx = bottomInsetPx,
+                        decorLeftInsetPx = leftInsetPx,
+                        decorRightInsetPx = rightInsetPx
                     )
                 }
             }
@@ -223,6 +258,7 @@ class KetomSyncImeService :
 
     override fun onStartInputView(editorInfo: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(editorInfo, restarting)
+        window?.window?.decorView?.let { ViewCompat.requestApplyInsets(it) }
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         keyboardController.syncAutoCapitalization(currentSettings.value.autoCapitalize)
