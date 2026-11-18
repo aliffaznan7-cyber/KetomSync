@@ -49,24 +49,24 @@ fun KeyboardSandboxScreen(
 
     val haptics = remember(context) { HapticFeedbackHelper(context) }
     val bridge = remember { SandboxEditorBridge() }
-    val controller = remember(bridge, scope) {
+    val controller = remember(bridge, scope, haptics) {
         KetomKeyboardController(
             bridge = bridge,
             scope = scope,
-            onHapticTick = { mult ->
-                haptics.pulse(
-                    enabled = settings.hapticEnabled,
-                    strength = settings.hapticStrength,
-                    durationMs = settings.hapticDurationMs,
-                    multiplier = mult
-                )
-            }
+            hapticHelper = haptics
         )
     }
 
     val fieldValue by bridge.fieldValue.collectAsStateWithLifecycle()
     val keyboardState by controller.state.collectAsStateWithLifecycle()
 
+    LaunchedEffect(settings.hapticEnabled, settings.hapticStrength, settings.hapticDurationMs) {
+        controller.updateHapticConfig(
+            enabled = settings.hapticEnabled,
+            intensity = settings.hapticStrength,
+            durationMs = settings.hapticDurationMs
+        )
+    }
     LaunchedEffect(settings.autoCapitalize) {
         controller.syncAutoCapitalization(settings.autoCapitalize)
     }

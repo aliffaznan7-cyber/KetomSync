@@ -119,10 +119,7 @@ class KetomSyncImeService :
         keyboardController = KetomKeyboardController(
             bridge = bridge,
             scope = serviceScope,
-            onHapticTick = { mult ->
-                val cfg = currentSettings.value
-                haptics.pulse(cfg.hapticEnabled, cfg.hapticStrength, cfg.hapticDurationMs, mult)
-            }
+            hapticHelper = haptics
         )
 
         serviceScope.launch {
@@ -131,6 +128,11 @@ class KetomSyncImeService :
         serviceScope.launch {
             settingsDataStore.settingsFlow.collectLatest { settings ->
                 currentSettings.value = settings
+                keyboardController.updateHapticConfig(
+                    enabled = settings.hapticEnabled,
+                    intensity = settings.hapticStrength,
+                    durationMs = settings.hapticDurationMs
+                )
             }
         }
 

@@ -96,6 +96,14 @@ class SettingsDataStore(private val context: Context) {
         context.ketomPrefsDataStore.edit { it[Keys.HAPTIC_DURATION_MS] = durationMs.coerceIn(1, 50) }
     }
 
+    suspend fun setHapticConfig(enabled: Boolean, strength: Float, durationMs: Int) {
+        context.ketomPrefsDataStore.edit {
+            it[Keys.HAPTIC_ENABLED] = enabled
+            it[Keys.HAPTIC_STRENGTH] = strength.coerceIn(0.1f, 1.0f)
+            it[Keys.HAPTIC_DURATION_MS] = durationMs.coerceIn(1, 50)
+        }
+    }
+
     suspend fun setKeyboardLayoutMode(mode: KeyboardLayoutMode) {
         context.ketomPrefsDataStore.edit { it[Keys.LAYOUT_MODE] = mode.wireValue }
     }

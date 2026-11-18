@@ -270,6 +270,16 @@ class KetomViewModel(
         viewModelScope.launch { settingsDataStore.setHapticDurationMs(durationMs) }
     }
 
+    fun applyHapticPreset(strength: Float, durationMs: Int) {
+        viewModelScope.launch {
+            settingsDataStore.setHapticConfig(
+                enabled = true,
+                strength = strength,
+                durationMs = durationMs
+            )
+        }
+    }
+
     fun setKeyboardLayoutMode(mode: KeyboardLayoutMode) {
         viewModelScope.launch { settingsDataStore.setKeyboardLayoutMode(mode) }
     }

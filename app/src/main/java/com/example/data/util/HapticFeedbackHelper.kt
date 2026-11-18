@@ -16,7 +16,7 @@ class HapticFeedbackHelper(context: Context) {
     }
 
     fun pulse(enabled: Boolean, strength: Float, durationMs: Int, multiplier: Float = 1.0f) {
-        if (!enabled) return
+        if (!enabled || strength <= 0f || multiplier <= 0f) return
         val vib = vibrator ?: return
         if (!vib.hasVibrator()) return
         val safeDuration = durationMs.coerceIn(1, 50).toLong()

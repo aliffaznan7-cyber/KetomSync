@@ -125,4 +125,153 @@ class KetomKeyboardControllerTest {
         )
         assertEquals("Hi Aliff, meet at GMI!", expanded)
     }
+
+    @Test
+    fun precedingTextCache_avoidsRepeatedIpcDuringRapidTypingAndBackspace() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val delegate = SandboxEditorBridge("")
+        var getTextBeforeCursorCalls = 0
+        val countingBridge = object : InputConnectionBridge by delegate {
+            override fun getTextBeforeCursor(length: Int): String {
+                getTextBeforeCursorCalls++
+                return delegate.getTextBeforeCursor(length)
+            }
+        }
+        val controller = KetomKeyboardController(
+            bridge = countingBridge,
+            scope = scope,
+            computeDispatcher = Dispatchers.Unconfined,
+            ioDispatcher = Dispatchers.Unconfined
+        )
+
+        // Single initial hydration on focus
+        controller.syncAutoCapitalization(autoCapEnabled = true)
+        assertEquals(1, getTextBeforeCursorCalls)
+
+        // Rapid sentence typing including spaces & punctuation should incur ZERO additional IPC calls
+        "hello. world ".forEach { ch ->
+            if (ch == ' ') {
+                controller.onSpacebarTouchDown()
+                controller.onSpacebarTapCommit(autoCapEnabled = true)
+            } else {
+                controller.onKeyTap(ch.toString(), autoCapEnabled = true)
+            }
+        }
+        assertEquals("Hello. World ", delegate.fieldValue.value.text)
+        assertEquals(ShiftMode.LOWERCASE, controller.state.value.shiftMode)
+        assertEquals(1, getTextBeforeCursorCalls)
+
+        // Rapid backspaces should also hit the in-memory cache with ZERO additional IPC calls
+        repeat(6) {
+            controller.onBackspacePressDown(autoCapEnabled = true)
+            controller.onBackspaceRelease(autoCapEnabled = true)
+        }
+        assertEquals("Hello. ", delegate.fieldValue.value.text)
+        assertEquals(ShiftMode.SHIFT_ONCE, controller.state.value.shiftMode)
+        assertEquals(1, getTextBeforeCursorCalls)
+
+        scope.cancel()
+    }
+
+    @Test
+    fun backgroundSnippetAndClipIndexing_populatesDerivedUiModels() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val bridge = SandboxEditorBridge()
+        val controller = KetomKeyboardController(
+            bridge = bridge,
+            scope = scope,
+            computeDispatcher = Dispatchers.Unconfined,
+            ioDispatcher = Dispatchers.Unconfined
+        )
+
+        val snippets = listOf(
+            com.example.data.local.SnippetEntity(
+                id = 1L,
+                remoteId = "s1",
+                title = "Standup",
+                shortcut = "/standup",
+                body = "Working on {task} in {repo}",
+                category = "macro",
+                updatedAtMillis = 100L
+            ),
+            com.example.data.local.SnippetEntity(
+                id = 2L,
+                remoteId = "s2",
+                title = "Greeting",
+                shortcut = "/hi",
+                body = "Hello there!",
+                category = "reply",
+                updatedAtMillis = 90L
+            )
+        )
+        controller.updateSnippetsIndexAsync(snippets)
+        assertEquals(2, controller.filteredSnippets.value.size)
+        assertEquals(listOf("task", "repo"), controller.filteredSnippets.value.first().variables)
+
+        controller.filterSnippetsAsync("standup")
+        assertEquals(1, controller.filteredSnippets.value.size)
+        assertEquals("/standup", controller.filteredSnippets.value.first().snippet.shortcut)
+
+        val clips = listOf(
+            com.example.data.local.ClipboardEntity(
+                id = 10L,
+                remoteId = "c1",
+                content = "https://example.com\nline2",
+                category = ClipboardCategory.LINK.wireValue,
+                isPinned = true,
+                deviceName = "Xiaomi Pad 7",
+                deviceType = com.example.data.model.DeviceType.TABLET.wireValue,
+                retentionPolicy = com.example.data.model.RetentionPolicy.NEVER.wireValue,
+                createdAtMillis = 100L,
+                updatedAtMillis = 100L,
+                expiresAtMillis = null
+            )
+        )
+        controller.updateClipboardChipsAsync(clips)
+        assertEquals(1, controller.clipChips.value.size)
+        assertEquals("https://example.com line", controller.clipChips.value.first().previewText)
+        assertTrue(controller.clipChips.value.first().isTabletSource)
+
+        scope.cancel()
+    }
+
+    @Test
+    fun hapticIntensity_isAppliedAndScaledByController() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val bridge = SandboxEditorBridge()
+        val settingsFlow = kotlinx.coroutines.flow.MutableStateFlow(
+            com.example.data.local.KetomSettings(
+                hapticEnabled = true,
+                hapticStrength = 0.4f,
+                hapticDurationMs = 12
+            )
+        )
+        val emittedIntensities = mutableListOf<Float>()
+        val controller = KetomKeyboardController(
+            bridge = bridge,
+            scope = scope,
+            onHapticTick = { emittedIntensities.add(it) },
+            computeDispatcher = Dispatchers.Unconfined,
+            ioDispatcher = Dispatchers.Unconfined
+        )
+        controller.bindHapticSettings(settingsFlow)
+
+        controller.onKeyTap("a", autoCapEnabled = false)
+        assertEquals(1, emittedIntensities.size)
+        assertEquals(0.4f, emittedIntensities[0], 0.001f)
+
+        // Updating DataStore-backed settings updates controller intensity immediately
+        settingsFlow.value = settingsFlow.value.copy(hapticStrength = 0.9f, hapticDurationMs = 24)
+        controller.onEnterTap(autoCapEnabled = false)
+        assertEquals(2, emittedIntensities.size)
+        assertEquals(0.99f, emittedIntensities[1], 0.001f)
+        assertEquals(24, controller.hapticConfig.value.durationMs)
+
+        // Disabling haptics stops key-press vibrations
+        settingsFlow.value = settingsFlow.value.copy(hapticEnabled = false)
+        controller.onKeyTap("b", autoCapEnabled = false)
+        assertEquals(2, emittedIntensities.size)
+
+        scope.cancel()
+    }
 }
